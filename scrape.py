@@ -1,34 +1,11 @@
 import sqlite3
 import os
-import glob
-import shutil
-import subprocess
 from urllib.parse import urljoin
 from playwright.sync_api import sync_playwright
 
-# --- ここから自己修復（フォルダ偽装）ロジック ---
-def setup_playwright_path():
-    # Playwrightのキャッシュ場所
-    base_cache_path = "/opt/render/.cache/ms-playwright"
-    os.environ["PLAYWRIGHT_BROWSERS_PATH"] = base_cache_path
-    
-    # 実際にインストールされているフォルダ（数字が何であっても）を探す
-    found_dirs = glob.glob(os.path.join(base_cache_path, "chromium_headless_shell-*"))
-    target_dir = os.path.join(base_cache_path, "chromium_headless_shell-1200")
-    
-    if found_dirs and not os.path.exists(target_dir):
-        # 1200というフォルダがなければ、見つかったフォルダからコピーして作る
-        source_dir = found_dirs[0]
-        print(f"Copying {source_dir} to {target_dir}...")
-        try:
-            shutil.copytree(source_dir, target_dir)
-            print("Successfully created the target directory.")
-        except Exception as e:
-            print(f"Copy failed: {e}")
-
-# プログラム開始時に実行
-setup_playwright_path()
-# --- ここまで ---
+# 重要：もし環境変数に間違ったパスが入っていたら消去する
+if "PLAYWRIGHT_BROWSERS_PATH" in os.environ:
+    del os.environ["PLAYWRIGHT_BROWSERS_PATH"]
 
 DB_NAME = "hellowork.db"
 
@@ -63,6 +40,7 @@ def run_hellowork():
     conn.commit()
 
     with sync_playwright() as p:
+        # パスを指定せず、Playwrightの標準インストール先を探させる
         browser = p.chromium.launch(
             headless=True,
             args=['--no-sandbox', '--disable-dev-shm-usage']
@@ -71,13 +49,12 @@ def run_hellowork():
         context = browser.new_context(viewport={"width": 1280, "height": 1000})
         page = context.new_page()
 
-        # 検索ページへ移動
+        # --- 以下、スクレイピング処理 ---
         page.goto("https://www.hellowork.mhlw.go.jp/kensaku/GECA110010.do?action=initDisp&screenId=GECA110010")
         page.check("#ID_ippanCKBox1")
-        page.select_option("#ID_tDFK1CmbBox", value="24") # 三重県
+        page.select_option("#ID_tDFK1CmbBox", value="24")
         page.click("#ID_Btn")
         
-        # 職種選択（技術職）
         page.evaluate("""openShokushuAssist("3","kiboSuruSKSU1Hidden","kiboSuruSKSU1Label");""")
         page.wait_for_timeout(2000)
         
@@ -141,7 +118,6 @@ def run_hellowork():
 
             conn.commit()
             
-            # 次のページへ
             next_btn = page.locator('input[name="fwListNaviBtnNext"]:not([disabled])')
             if next_btn.count() == 0:
                 break
