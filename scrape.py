@@ -1,10 +1,13 @@
-from playwright.sync_api import sync_playwright
 import sqlite3
 import os
-from urllib.parse import urljoin
 import glob
+from urllib.parse import urljoin
+from playwright.sync_api import sync_playwright
 
 DB_NAME = "hellowork.db"
+
+# Playwrightがブラウザを探す場所を強制固定
+os.environ["PLAYWRIGHT_BROWSERS_PATH"] = "/opt/render/.cache/ms-playwright"
 
 def init_db():
     conn = sqlite3.connect(DB_NAME)
@@ -22,6 +25,12 @@ def init_db():
     conn.commit()
     conn.close()
 
+def get_executable_path():
+    # chromium_headless_shell のパスを動的に取得
+    pattern = '/opt/render/.cache/ms-playwright/chromium_headless_shell-*/chrome-headless-shell-linux64/chrome-headless-shell'
+    paths = glob.glob(pattern)
+    return paths[0] if paths else None
+
 def text_by_label(card, label):
     try:
         return card.locator(
@@ -31,40 +40,34 @@ def text_by_label(card, label):
         return []
 
 def run_hellowork():
-    # ... 前半の処理 ...
+    # DBの初期化と既存データの削除
+    init_db()
+    conn = sqlite3.connect(DB_NAME)
+    conn.execute("DELETE FROM jobs")
+    conn.commit()
 
     with sync_playwright() as p:
-        # Render上のPlaywrightのインストール先を直接指定
-        # バージョン番号(1200等)が変わってもいいように探索します
-        base_path = '/opt/render/.cache/ms-playwright/chromium_headless_shell-*/chrome-headless-shell-linux64/chrome-headless-shell'
-        found_paths = glob.glob(base_path)
+        executable = get_executable_path()
         
-        if found_paths:
-            executable = found_paths[0]
-        else:
-            # 見つからない場合はデフォルトに任せる
-            executable = None
-
         browser = p.chromium.launch(
             headless=True,
             executable_path=executable,
             args=['--no-sandbox', '--disable-dev-shm-usage']
         )
         
-        # 以下の2行が続いていることを確認
-        context = browser.new_context(viewport={"width": 1280, "height": 1000})
-        page = context.new_page()
-        
         context = browser.new_context(viewport={"width": 1280, "height": 1000})
         page = context.new_page()
 
+        # ハローワーク検索開始
         page.goto("https://www.hellowork.mhlw.go.jp/kensaku/GECA110010.do?action=initDisp&screenId=GECA110010")
         page.check("#ID_ippanCKBox1")
-        page.select_option("#ID_tDFK1CmbBox", value="24")
+        page.select_option("#ID_tDFK1CmbBox", value="24") # 三重県
         page.click("#ID_Btn")
         
+        # 職種選択（技術職）
         page.evaluate("""openShokushuAssist("3","kiboSuruSKSU1Hidden","kiboSuruSKSU1Label");""")
         page.wait_for_timeout(2000)
+        
         popup = context.pages[-1]
         popup.locator('div.i_box:has(i[alt*="技術職"])').focus()
         popup.keyboard.press("Enter")
@@ -78,18 +81,13 @@ def run_hellowork():
         total = 0
         page_no = 1
 
-        # =========================
-        # ページネーション開始
-        # =========================
         while True:
             print(f"\n--- {page_no}ページ目 ---")
-
             tables = page.locator("table.kyujin")
             count = tables.count()
 
             for i in range(count):
                 card = tables.nth(i)
-
                 all_text = card.inner_text()
                 lines = [line.replace('\t', '').strip() for line in all_text.split('\n') if line.strip()]
                 
@@ -99,16 +97,13 @@ def run_hellowork():
                 for idx, text in enumerate(lines):
                     if "受付年月日：" in text:
                         reception_date = text.replace("受付年月日：", "").strip()
-                        if not reception_date and idx + 1 < len(lines):
-                            reception_date = lines[idx+1]
                     if "紹介期限日：" in text:
                         expiry_date = text.replace("紹介期限日：", "").strip()
-                        if not expiry_date and idx + 1 < len(lines):
-                            expiry_date = lines[idx+1]
 
-                raw_job_category = card.locator(
-                    "xpath=.//strong[contains(text(),'職種')]/ancestor::tr//div"
-                ).first.inner_text().strip()
+                try:
+                    raw_job_category = card.locator("xpath=.//strong[contains(text(),'職種')]/ancestor::tr//div").first.inner_text().strip()
+                except:
+                    raw_job_category = "不明"
                 
                 job_data = (
                     raw_job_category.replace("職種", "").strip(),
@@ -132,19 +127,14 @@ def run_hellowork():
                     "INSERT INTO jobs (job_category,company_name,work_location,job_description,employment_type,salary,working_hours,holidays,age_limit,job_number,disclosure_scope,detail_url,pdf_url,reception_date,expiry_date) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                     job_data
                 )
-
                 total += 1
-                print(f"{total}件目 保存完了: 受付 {reception_date}")
 
             conn.commit()
+            print(f"{page_no}ページ目完了（累計{total}件）")
 
-            # ---- 下の「次へ＞」のみ使用 ----
-            next_buttons = page.locator(
-                'input[name="fwListNaviBtnNext"]:not([disabled])'
-            )
-
+            # ページネーション
+            next_buttons = page.locator('input[name="fwListNaviBtnNext"]:not([disabled])')
             if next_buttons.count() == 0:
-                print("\n--- 最終ページ ---")
                 break
 
             next_buttons.last.click()
