@@ -36,7 +36,10 @@ def run_hellowork():
     conn.commit()
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
+        browser = p.chromium.launch(
+        headless=True,  # 必ず True にする
+        args=['--no-sandbox', '--disable-dev-shm-usage'] # サーバーで動かすための必須オプション
+)
         context = browser.new_context(viewport={"width":1280,"height":1000})
         page = context.new_page()
 
