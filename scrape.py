@@ -47,16 +47,18 @@ def run_hellowork():
     conn.commit()
 
     with sync_playwright() as p:
-        executable = get_executable_path()
-        
+        # すべて with の中に「4つのスペース」で揃えて入れます
         browser = p.chromium.launch(
             headless=True,
-            executable_path=executable,
             args=['--no-sandbox', '--disable-dev-shm-usage']
         )
         
         context = browser.new_context(viewport={"width": 1280, "height": 1000})
         page = context.new_page()
+
+        # この後に続く page.goto(...) なども、
+        # すべて context と同じ位置（左から8スペース空ける）に揃えてください
+        page.goto("https://www.hellowork.mhlw.go.jp/kensaku/GECA110010.do?action=initDisp&screenId=GECA110010")
 
         # ハローワーク検索開始
         page.goto("https://www.hellowork.mhlw.go.jp/kensaku/GECA110010.do?action=initDisp&screenId=GECA110010")
