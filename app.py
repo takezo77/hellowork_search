@@ -75,8 +75,18 @@ def index():
 
 @app.route("/update_data")
 def update_data():
-    subprocess.run([sys.executable, "scrape.py"], check=True)
-    return redirect(url_for('index'))
+    try:
+        # 子プロセスに現在の環境変数（Playwrightのパスなど）を引き継がせる
+        import os
+        env = os.environ.copy()
+        
+        # scrape.py を実行
+        subprocess.run([sys.executable, "scrape.py"], check=True, env=env)
+        
+        return redirect(url_for('index'))
+    except subprocess.CalledProcessError as e:
+        # エラーが起きた場合にブラウザで確認できるようにする
+        return f"スクレイピング失敗: {e}", 500
 
 @app.route("/add_to_list/<int:job_id>")
 def add_to_list(job_id):
