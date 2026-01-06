@@ -36,7 +36,7 @@ def run_hellowork():
     conn.commit()
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=False)
+        browser = p.chromium.launch(headless=True)
         context = browser.new_context(viewport={"width":1280,"height":1000})
         page = context.new_page()
 
