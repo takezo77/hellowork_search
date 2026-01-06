@@ -37,13 +37,12 @@ def run_hellowork():
 
     with sync_playwright() as p:
         browser = p.chromium.launch(
-        headless=True,
-        # Render上でのChromiumの実行パスを直接指定
-        executable_path='/opt/render/.cache/ms-playwright/chromium-1200/chrome-linux64/chrome',
-        args=['--no-sandbox', '--disable-dev-shm-usage']
+            headless=True,
+            executable_path='/opt/render/.cache/ms-playwright/chromium_headless_shell-1200/chrome-headless-shell-linux64/chrome-headless-shell',
+            args=['--no-sandbox', '--disable-dev-shm-usage']
         )
-
-        context = browser.new_context(viewport={"width":1280,"height":1000})
+        
+        context = browser.new_context(viewport={"width": 1280, "height": 1000})
         page = context.new_page()
 
         page.goto("https://www.hellowork.mhlw.go.jp/kensaku/GECA110010.do?action=initDisp&screenId=GECA110010")
