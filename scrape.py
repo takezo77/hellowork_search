@@ -36,11 +36,15 @@ def run_hellowork():
     conn.commit()
 
     with sync_playwright() as p:
+        # パス指定を削除し、Playwrightの自動探索に任せる
         browser = p.chromium.launch(
-            headless=True,
-            executable_path='/opt/render/.cache/ms-playwright/chromium_headless_shell-1200/chrome-headless-shell-linux64/chrome-headless-shell',
+            headless=True, 
             args=['--no-sandbox', '--disable-dev-shm-usage']
         )
+        
+        # 以下の2行が続いていることを確認
+        context = browser.new_context(viewport={"width": 1280, "height": 1000})
+        page = context.new_page()
         
         context = browser.new_context(viewport={"width": 1280, "height": 1000})
         page = context.new_page()
