@@ -1,13 +1,36 @@
 import sqlite3
 import os
 import glob
+import shutil
+import subprocess
 from urllib.parse import urljoin
 from playwright.sync_api import sync_playwright
 
-DB_NAME = "hellowork.db"
+# --- ここから自己修復（フォルダ偽装）ロジック ---
+def setup_playwright_path():
+    # Playwrightのキャッシュ場所
+    base_cache_path = "/opt/render/.cache/ms-playwright"
+    os.environ["PLAYWRIGHT_BROWSERS_PATH"] = base_cache_path
+    
+    # 実際にインストールされているフォルダ（数字が何であっても）を探す
+    found_dirs = glob.glob(os.path.join(base_cache_path, "chromium_headless_shell-*"))
+    target_dir = os.path.join(base_cache_path, "chromium_headless_shell-1200")
+    
+    if found_dirs and not os.path.exists(target_dir):
+        # 1200というフォルダがなければ、見つかったフォルダからコピーして作る
+        source_dir = found_dirs[0]
+        print(f"Copying {source_dir} to {target_dir}...")
+        try:
+            shutil.copytree(source_dir, target_dir)
+            print("Successfully created the target directory.")
+        except Exception as e:
+            print(f"Copy failed: {e}")
 
-# Playwrightがブラウザを探す場所を固定
-os.environ["PLAYWRIGHT_BROWSERS_PATH"] = "/opt/render/.cache/ms-playwright"
+# プログラム開始時に実行
+setup_playwright_path()
+# --- ここまで ---
+
+DB_NAME = "hellowork.db"
 
 def init_db():
     conn = sqlite3.connect(DB_NAME)
@@ -40,7 +63,6 @@ def run_hellowork():
     conn.commit()
 
     with sync_playwright() as p:
-        # Build Commandでのフォルダ偽装を前提に、標準設定で起動
         browser = p.chromium.launch(
             headless=True,
             args=['--no-sandbox', '--disable-dev-shm-usage']
