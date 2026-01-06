@@ -7,8 +7,11 @@ from playwright.sync_api import sync_playwright
 if "PLAYWRIGHT_BROWSERS_PATH" in os.environ:
     del os.environ["PLAYWRIGHT_BROWSERS_PATH"]
 
-DB_NAME = "hellowork.db"
+os.environ.pop("PLAYWRIGHT_BROWSERS_PATH", None)
+os.environ["PLAYWRIGHT_BROWSERS_PATH"] = "/opt/render/project/src/.cache/ms-playwright"
 
+DB_NAME = "hellowork.db"
+os.environ["PLAYWRIGHT_BROWSERS_PATH"] = "/opt/render/project/src/.cache/ms-playwright"
 def init_db():
     conn = sqlite3.connect(DB_NAME)
     cur = conn.cursor()
@@ -40,7 +43,6 @@ def run_hellowork():
     conn.commit()
 
     with sync_playwright() as p:
-        # パスを指定せず、Playwrightの標準インストール先を探させる
         browser = p.chromium.launch(
             headless=True,
             args=['--no-sandbox', '--disable-dev-shm-usage']
