@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="action-bar">
+    <a href="{{ url_for('index') }}" class="btn btn-search">⬅ 検索画面へ戻る</a>
+</div>
+
+<h2>選んだ求人リスト</h2>
+
+<table class="job-table">
+    <thead>
+        <tr>
+            <th class="col-date">求人番号</th>
+            <th>会社名 / 就業場所</th>
+            <th>職種 / 仕事内容</th>
+            <th class="col-salary">賃金</th>
+            <th class="col-link">リンク</th>
+            <th class="col-add">操作</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for item in saved_jobs %}
+        <tr>
+            <td class="col-date">{{ item.job_number }}</td>
+            
+            <td>
+                <div class="company-name">{{ item.company_name }}</div>
+                <div class="location-text">📍 {{ item.work_location }}</div>
+            </td>
+
+            <td>
+                <div class="label-reception">{{ item.job_category }}</div>
+                <div class="description-truncate">{{ item.job_description }}</div>
+            </td>
+
+            <td class="col-salary">
+                <span class="company-name">{{ item.salary }}</span>
+            </td>
+
+            <td class="col-link">
+                <a href="{{ item.detail_url }}" target="_blank" class="link-item">詳細</a>
+                <a href="{{ item.pdf_url }}" target="_blank" class="link-item">求人票</a>
+            </td>
+
+            <td class="col-add">
+                <a href="{{ url_for('delete_item', item_id=item.id) }}" class="btn-delete-text" onclick="return confirm('リストから削除しますか？')">削除</a>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% if not saved_jobs %}
+<div class="empty-state">
+    <p>保存された求人はありません。</p>
+</div>
+{% endif %}
+{% endblock %}

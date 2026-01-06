@@ -1,0 +1,42 @@
+/* 仕事内容の微調整 */
+.description-truncate {
+    color: #444;
+    font-size: 12px;
+    margin-top: 4px;
+    /* 4行で省略する設定 */
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 4;
+    -webkit-box-orient: vertical;
+}
+
+/* 会社名と場所のスタイル */
+.company-name {
+    font-weight: bold;
+    color: #37352f;
+    display: block;
+}
+
+.location-text {
+    color: #6b6b6b;
+    font-size: 11px;
+    margin-top: 4px;
+}
+
+/* 削除リンクの見た目 */
+.btn-delete-text {
+    color: #dc3545;
+    text-decoration: none;
+    font-size: 12px;
+    font-weight: bold;
+}
+/* 賃金カラムの幅を内容に合わせて少し広めに設定 */
+.col-salary { 
+    width: 160px; 
+    white-space: nowrap; /* 金額が途中で改行されないようにします */
+}
+
+/* 求人番号の幅 */
+.col-date { 
+    width: 140px; 
+}
