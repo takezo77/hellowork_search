@@ -2,6 +2,7 @@ from playwright.sync_api import sync_playwright
 import sqlite3
 import os
 from urllib.parse import urljoin
+import glob
 
 DB_NAME = "hellowork.db"
 
@@ -30,15 +31,23 @@ def text_by_label(card, label):
         return []
 
 def run_hellowork():
-    init_db()
-    conn = sqlite3.connect(DB_NAME)
-    conn.execute("DELETE FROM jobs")
-    conn.commit()
+    # ... 前半の処理 ...
 
     with sync_playwright() as p:
-        # パス指定を削除し、Playwrightの自動探索に任せる
+        # Render上のPlaywrightのインストール先を直接指定
+        # バージョン番号(1200等)が変わってもいいように探索します
+        base_path = '/opt/render/.cache/ms-playwright/chromium_headless_shell-*/chrome-headless-shell-linux64/chrome-headless-shell'
+        found_paths = glob.glob(base_path)
+        
+        if found_paths:
+            executable = found_paths[0]
+        else:
+            # 見つからない場合はデフォルトに任せる
+            executable = None
+
         browser = p.chromium.launch(
-            headless=True, 
+            headless=True,
+            executable_path=executable,
             args=['--no-sandbox', '--disable-dev-shm-usage']
         )
         
