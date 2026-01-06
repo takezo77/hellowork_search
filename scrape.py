@@ -6,7 +6,7 @@ from playwright.sync_api import sync_playwright
 
 DB_NAME = "hellowork.db"
 
-# Playwrightがブラウザを探す場所を強制固定
+# Playwrightがブラウザを探す場所を固定
 os.environ["PLAYWRIGHT_BROWSERS_PATH"] = "/opt/render/.cache/ms-playwright"
 
 def init_db():
@@ -25,12 +25,6 @@ def init_db():
     conn.commit()
     conn.close()
 
-def get_executable_path():
-    # chromium_headless_shell のパスを動的に取得
-    pattern = '/opt/render/.cache/ms-playwright/chromium_headless_shell-*/chrome-headless-shell-linux64/chrome-headless-shell'
-    paths = glob.glob(pattern)
-    return paths[0] if paths else None
-
 def text_by_label(card, label):
     try:
         return card.locator(
@@ -40,14 +34,13 @@ def text_by_label(card, label):
         return []
 
 def run_hellowork():
-    # DBの初期化と既存データの削除
     init_db()
     conn = sqlite3.connect(DB_NAME)
     conn.execute("DELETE FROM jobs")
     conn.commit()
 
     with sync_playwright() as p:
-        # すべて with の中に「4つのスペース」で揃えて入れます
+        # Build Commandでのフォルダ偽装を前提に、標準設定で起動
         browser = p.chromium.launch(
             headless=True,
             args=['--no-sandbox', '--disable-dev-shm-usage']
@@ -56,11 +49,7 @@ def run_hellowork():
         context = browser.new_context(viewport={"width": 1280, "height": 1000})
         page = context.new_page()
 
-        # この後に続く page.goto(...) なども、
-        # すべて context と同じ位置（左から8スペース空ける）に揃えてください
-        page.goto("https://www.hellowork.mhlw.go.jp/kensaku/GECA110010.do?action=initDisp&screenId=GECA110010")
-
-        # ハローワーク検索開始
+        # 検索ページへ移動
         page.goto("https://www.hellowork.mhlw.go.jp/kensaku/GECA110010.do?action=initDisp&screenId=GECA110010")
         page.check("#ID_ippanCKBox1")
         page.select_option("#ID_tDFK1CmbBox", value="24") # 三重県
@@ -84,31 +73,28 @@ def run_hellowork():
         page_no = 1
 
         while True:
-            print(f"\n--- {page_no}ページ目 ---")
+            print(f"--- {page_no}ページ目 ---")
             tables = page.locator("table.kyujin")
             count = tables.count()
 
             for i in range(count):
                 card = tables.nth(i)
                 all_text = card.inner_text()
-                lines = [line.replace('\t', '').strip() for line in all_text.split('\n') if line.strip()]
+                lines = [l.strip() for l in all_text.split('\n') if l.strip()]
                 
                 reception_date = ""
                 expiry_date = ""
-                
                 for idx, text in enumerate(lines):
-                    if "受付年月日：" in text:
-                        reception_date = text.replace("受付年月日：", "").strip()
-                    if "紹介期限日：" in text:
-                        expiry_date = text.replace("紹介期限日：", "").strip()
+                    if "受付年月日：" in text: reception_date = text.replace("受付年月日：", "").strip()
+                    if "紹介期限日：" in text: expiry_date = text.replace("紹介期限日：", "").strip()
 
                 try:
-                    raw_job_category = card.locator("xpath=.//strong[contains(text(),'職種')]/ancestor::tr//div").first.inner_text().strip()
+                    job_cat = card.locator("xpath=.//strong[contains(text(),'職種')]/ancestor::tr//div").first.inner_text().strip()
                 except:
-                    raw_job_category = "不明"
+                    job_cat = "不明"
                 
                 job_data = (
-                    raw_job_category.replace("職種", "").strip(),
+                    job_cat.replace("職種", "").strip(),
                     " ".join(text_by_label(card, "事業所名")),
                     " ".join(text_by_label(card, "就業場所")),
                     " ".join(text_by_label(card, "仕事の内容")),
@@ -132,14 +118,12 @@ def run_hellowork():
                 total += 1
 
             conn.commit()
-            print(f"{page_no}ページ目完了（累計{total}件）")
-
-            # ページネーション
-            next_buttons = page.locator('input[name="fwListNaviBtnNext"]:not([disabled])')
-            if next_buttons.count() == 0:
+            
+            # 次のページへ
+            next_btn = page.locator('input[name="fwListNaviBtnNext"]:not([disabled])')
+            if next_btn.count() == 0:
                 break
-
-            next_buttons.last.click()
+            next_btn.last.click()
             page.wait_for_selector("table.kyujin")
             page_no += 1
 
