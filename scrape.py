@@ -37,9 +37,12 @@ def run_hellowork():
 
     with sync_playwright() as p:
         browser = p.chromium.launch(
-        headless=True,  # 必ず True にする
-        args=['--no-sandbox', '--disable-dev-shm-usage'] # サーバーで動かすための必須オプション
-)
+        headless=True,
+        # Render上でのChromiumの実行パスを直接指定
+        executable_path='/opt/render/.cache/ms-playwright/chromium-1200/chrome-linux64/chrome',
+        args=['--no-sandbox', '--disable-dev-shm-usage']
+        )
+
         context = browser.new_context(viewport={"width":1280,"height":1000})
         page = context.new_page()
 
