@@ -1,9 +1,13 @@
 from playwright.sync_api import sync_playwright
 import sqlite3
 import os
+import sys
 from urllib.parse import urljoin
 
 DB_NAME = "hellowork.db"
+
+# コマンドライン引数から都道府県コードを取得 (デフォルト: 24=三重県)
+PREFECTURE_CODE = sys.argv[1] if len(sys.argv) > 1 else "24"
 
 def init_db():
     conn = sqlite3.connect(DB_NAME)
@@ -43,7 +47,7 @@ def run_hellowork():
 
         page.goto("https://www.hellowork.mhlw.go.jp/kensaku/GECA110010.do?action=initDisp&screenId=GECA110010")
         page.check("#ID_ippanCKBox1")
-        page.select_option("#ID_tDFK1CmbBox", value="24")
+        page.select_option("#ID_tDFK1CmbBox", value=PREFECTURE_CODE)
         page.click("#ID_Btn")
         
         page.evaluate("""openShokushuAssist("3","kiboSuruSKSU1Hidden","kiboSuruSKSU1Label");""")

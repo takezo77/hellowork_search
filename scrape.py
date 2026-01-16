@@ -1,17 +1,14 @@
+from playwright.sync_api import sync_playwright
 import sqlite3
 import os
+import sys
 from urllib.parse import urljoin
-from playwright.sync_api import sync_playwright
-
-# 重要：もし環境変数に間違ったパスが入っていたら消去する
-if "PLAYWRIGHT_BROWSERS_PATH" in os.environ:
-    del os.environ["PLAYWRIGHT_BROWSERS_PATH"]
-
-os.environ.pop("PLAYWRIGHT_BROWSERS_PATH", None)
-os.environ["PLAYWRIGHT_BROWSERS_PATH"] = "/opt/render/project/src/.cache/ms-playwright"
 
 DB_NAME = "hellowork.db"
-os.environ["PLAYWRIGHT_BROWSERS_PATH"] = "/opt/render/project/src/.cache/ms-playwright"
+
+# コマンドライン引数から都道府県コードを取得 (デフォルト: 24=三重県)
+PREFECTURE_CODE = sys.argv[1] if len(sys.argv) > 1 else "24"
+
 def init_db():
     conn = sqlite3.connect(DB_NAME)
     cur = conn.cursor()
@@ -29,6 +26,7 @@ def init_db():
     conn.close()
 
 def text_by_label(card, label):
+    # 通常のテーブル項目用
     try:
         return card.locator(
             f"xpath=.//td[contains(@class,'fb')][contains(normalize-space(),'{label}')]/following-sibling::td//div"
@@ -43,23 +41,17 @@ def run_hellowork():
     conn.commit()
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(
-            headless=True,
-            args=['--no-sandbox', '--disable-dev-shm-usage']
-        )
-        
-        context = browser.new_context(viewport={"width": 1280, "height": 1000})
+        browser = p.chromium.launch(headless=False)
+        context = browser.new_context(viewport={"width":1280,"height":1000})
         page = context.new_page()
 
-        # --- 以下、スクレイピング処理 ---
         page.goto("https://www.hellowork.mhlw.go.jp/kensaku/GECA110010.do?action=initDisp&screenId=GECA110010")
         page.check("#ID_ippanCKBox1")
-        page.select_option("#ID_tDFK1CmbBox", value="24")
+        page.select_option("#ID_tDFK1CmbBox", value=PREFECTURE_CODE)
         page.click("#ID_Btn")
         
         page.evaluate("""openShokushuAssist("3","kiboSuruSKSU1Hidden","kiboSuruSKSU1Label");""")
         page.wait_for_timeout(2000)
-        
         popup = context.pages[-1]
         popup.locator('div.i_box:has(i[alt*="技術職"])').focus()
         popup.keyboard.press("Enter")
@@ -69,64 +61,57 @@ def run_hellowork():
         page.click("#ID_searchBtn")
         page.wait_for_selector("table.kyujin")
 
+        tables = page.locator("table.kyujin")
+        count = min(tables.count(), 30)
         base_url = "https://www.hellowork.mhlw.go.jp/kensaku/"
-        total = 0
-        page_no = 1
 
-        while True:
-            print(f"--- {page_no}ページ目 ---")
-            tables = page.locator("table.kyujin")
-            count = tables.count()
-
-            for i in range(count):
-                card = tables.nth(i)
-                all_text = card.inner_text()
-                lines = [l.strip() for l in all_text.split('\n') if l.strip()]
-                
-                reception_date = ""
-                expiry_date = ""
-                for idx, text in enumerate(lines):
-                    if "受付年月日：" in text: reception_date = text.replace("受付年月日：", "").strip()
-                    if "紹介期限日：" in text: expiry_date = text.replace("紹介期限日：", "").strip()
-
-                try:
-                    job_cat = card.locator("xpath=.//strong[contains(text(),'職種')]/ancestor::tr//div").first.inner_text().strip()
-                except:
-                    job_cat = "不明"
-                
-                job_data = (
-                    job_cat.replace("職種", "").strip(),
-                    " ".join(text_by_label(card, "事業所名")),
-                    " ".join(text_by_label(card, "就業場所")),
-                    " ".join(text_by_label(card, "仕事の内容")),
-                    " ".join(text_by_label(card, "雇用形態")),
-                    " ".join(text_by_label(card, "賃金")),
-                    " ".join(text_by_label(card, "就業時間")),
-                    " ".join(text_by_label(card, "休日")),
-                    " ".join(text_by_label(card, "年齢")),
-                    " ".join(text_by_label(card, "求人番号")),
-                    " ".join(text_by_label(card, "公開範囲")),
-                    urljoin(base_url, card.locator("#ID_dispDetailBtn").get_attribute("href") or ""),
-                    urljoin(base_url, card.locator("#ID_kyujinhyoBtn").get_attribute("href") or ""),
-                    reception_date,
-                    expiry_date
-                )
-
-                conn.execute(
-                    "INSERT INTO jobs (job_category,company_name,work_location,job_description,employment_type,salary,working_hours,holidays,age_limit,job_number,disclosure_scope,detail_url,pdf_url,reception_date,expiry_date) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                    job_data
-                )
-                total += 1
-
-            conn.commit()
+        for i in range(count):
+            card = tables.nth(i)
             
-            next_btn = page.locator('input[name="fwListNaviBtnNext"]:not([disabled])')
-            if next_btn.count() == 0:
-                break
-            next_btn.last.click()
-            page.wait_for_selector("table.kyujin")
-            page_no += 1
+            # --- 高速日付抽出 ---
+            # XPathで1つずつ探すと遅いため、カードのテキストを分割して取得
+            all_text = card.inner_text()
+            lines = [line.replace('\t', '').strip() for line in all_text.split('\n') if line.strip()]
+            
+            reception_date = ""
+            expiry_date = ""
+            
+            for idx, text in enumerate(lines):
+                if "受付年月日：" in text:
+                    # 「受付年月日：2025年...」となっている場合と、次の行にある場合両方に対応
+                    reception_date = text.replace("受付年月日：", "").strip()
+                    if not reception_date and idx + 1 < len(lines):
+                        reception_date = lines[idx+1]
+                if "紹介期限日：" in text:
+                    expiry_date = text.replace("紹介期限日：", "").strip()
+                    if not expiry_date and idx + 1 < len(lines):
+                        expiry_date = lines[idx+1]
 
+            # 職種
+            raw_job_category = card.locator("xpath=.//strong[contains(text(),'職種')]/ancestor::tr//div").first.inner_text().strip()
+            
+            job_data = (
+                raw_job_category.replace("職種", "").strip(),
+                " ".join(text_by_label(card, "事業所名")),
+                " ".join(text_by_label(card, "就業場所")),
+                " ".join(text_by_label(card, "仕事の内容")),
+                " ".join(text_by_label(card, "雇用形態")),
+                " ".join(text_by_label(card, "賃金")),
+                " ".join(text_by_label(card, "就業時間")),
+                " ".join(text_by_label(card, "休日")),
+                " ".join(text_by_label(card, "年齢")),
+                " ".join(text_by_label(card, "求人番号")),
+                " ".join(text_by_label(card, "公開範囲")),
+                urljoin(base_url, card.locator("#ID_dispDetailBtn").get_attribute("href") or ""),
+                urljoin(base_url, card.locator("#ID_kyujinhyoBtn").get_attribute("href") or ""),
+                reception_date,
+                expiry_date
+            )
+
+            conn.execute("INSERT INTO jobs (job_category,company_name,work_location,job_description,employment_type,salary,working_hours,holidays,age_limit,job_number,disclosure_scope,detail_url,pdf_url,reception_date,expiry_date) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", job_data)
+            print(f"{i+1}件目 保存完了: 受付 {reception_date}")
+        
+        conn.commit()
         conn.close()
         browser.close()
 

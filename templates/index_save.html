@@ -2,11 +2,18 @@
 
 {% block content %}
 <div class="action-bar">
-    <a href="{{ url_for('update_data') }}" 
-       class="btn btn-update" 
-       onclick="this.style.pointerEvents='none'; this.innerText='🔄 更新中（約1分）...';">
-       🔄 求人を更新
-    </a>
+    <form action="{{ url_for('update_data') }}" method="POST" class="pref-form" id="updateForm">
+        <select name="prefecture" class="pref-select">
+            {% for code, name in prefectures %}
+            <option value="{{ code }}" {% if code==selected_prefecture %}selected{% endif %}>{{ name }}</option>
+            {% endfor %}
+        </select>
+        <button type="submit" class="btn btn-update"
+            onclick="this.disabled=true; this.innerText='🔄 更新中...'; this.form.submit();">
+            🔄 求人を更新
+        </button>
+    </form>
+    <span class="current-pref">現在: <strong>{{ selected_prefecture_name }}</strong></span>
     <a href="{{ url_for('my_list_view') }}" class="btn btn-primary">➔ 選んだ求人</a>
     <a href="{{ url_for('export') }}" class="btn btn-success">Excel全出力</a>
 </div>
@@ -31,6 +38,7 @@
             <th>会社名 / 場所</th>
             <th>仕事内容</th>
             <th class="col-salary">賃金</th>
+            <th class="col-age">年齢制限</th>
             <th class="col-link">リンク</th>
             <th class="col-add">追加</th>
         </tr>
@@ -42,26 +50,30 @@
                 <span class="label-reception">受:</span> {{ job.reception_date if job.reception_date else "---" }}<br>
                 <span class="label-expiry">限:</span> {{ job.expiry_date if job.expiry_date else "---" }}
             </td>
-            
+
             <td class="cell-category">
                 <strong>{{ job.job_category }}</strong>
             </td>
-            
+
             <td class="cell-company">
                 <div class="company-name">{{ job.company_name }}</div>
                 <div class="location-text">📍 {{ job.work_location }}</div>
             </td>
-            
+
             <td class="cell-description">
                 <div class="description-truncate">
                     {{ job.job_description }}
                 </div>
             </td>
-            
+
             <td class="cell-salary">
                 {{ job.salary }}
             </td>
-            
+
+            <td class="cell-age">
+                {{ job.age_limit if job.age_limit else "---" }}
+            </td>
+
             <td class="cell-links">
                 {% if job.detail_url %}
                 <a href="{{ job.detail_url }}" target="_blank" class="link-item">詳細</a>
@@ -70,7 +82,7 @@
                 <a href="{{ job.pdf_url }}" target="_blank" class="link-item">求人票</a>
                 {% endif %}
             </td>
-            
+
             <td class="cell-action">
                 <a href="{{ url_for('add_to_list', job_id=job.id) }}" class="btn-add">追加</a>
             </td>

@@ -7,48 +7,81 @@
 
 <h2>選んだ求人リスト</h2>
 
-<table class="job-table">
-    <thead>
-        <tr>
-            <th class="col-date">求人番号</th>
-            <th>会社名 / 就業場所</th>
-            <th>職種 / 仕事内容</th>
-            <th class="col-salary">賃金</th>
-            <th class="col-link">リンク</th>
-            <th class="col-add">操作</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for item in saved_jobs %}
-        <tr>
-            <td class="col-date">{{ item.job_number }}</td>
-            
-            <td>
-                <div class="company-name">{{ item.company_name }}</div>
-                <div class="location-text">📍 {{ item.location }}</div>
-            </td>
 
-            <td>
-                <div class="label-reception">{{ item.job_category }}</div>
-                <div class="description-truncate">{{ item.job_description }}</div>
-            </td>
+<script>
+    function toggleAll(source) {
+        checkboxes = document.getElementsByName('selected_ids');
+        for (var i = 0, n = checkboxes.length; i < n; i++) {
+            checkboxes[i].checked = source.checked;
+        }
+    }
 
-            <td class="col-salary">
-                <span class="company-name">{{ item.salary }}</span>
-            </td>
+    function validateForm() {
+        var checkboxes = document.querySelectorAll('input[name="selected_ids"]:checked');
+        if (checkboxes.length === 0) {
+            alert("求人を1つ以上選択してください。");
+            return false;
+        }
+        return true;
+    }
+</script>
 
-            <td class="col-link">
-                <a href="{{ item.detail_url }}" target="_blank" class="link-item">詳細</a>
-                <a href="{{ item.pdf_url }}" target="_blank" class="link-item">求人票</a>
-            </td>
+<form action="{{ url_for('export_selected') }}" method="post" onsubmit="return validateForm()">
+    <div class="action-bar"
+        style="justify-content: space-between; display: flex; align-items: center; margin-bottom: 1rem;">
+        <button type="submit" class="btn btn-search" style="background-color: #28a745;">✔ 選択した求人をExcelで送る</button>
+    </div>
 
-            <td class="col-add">
-                <a href="{{ url_for('delete_item', item_id=item.id) }}" class="btn-delete-text" onclick="return confirm('リストから削除しますか？')">削除</a>
-            </td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
+    <table class="job-table">
+        <thead>
+            <tr>
+                <th class="col-check" style="text-align: center;">
+                    <input type="checkbox" onclick="toggleAll(this)" style="transform: scale(1.5);">
+                </th>
+                <th class="col-date">求人番号</th>
+                <th>会社名 / 就業場所</th>
+                <th>職種 / 仕事内容</th>
+                <th class="col-salary">賃金</th>
+                <th class="col-link">リンク</th>
+                <th class="col-add">操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in saved_jobs %}
+            <tr>
+                <td class="col-check" style="text-align: center;">
+                    <input type="checkbox" name="selected_ids" value="{{ item.id }}" style="transform: scale(1.5);">
+                </td>
+                <td class="col-date">{{ item.job_number }}</td>
+
+                <td>
+                    <div class="company-name">{{ item.company_name }}</div>
+                    <div class="location-text">📍 {{ item.work_location }}</div>
+                </td>
+
+                <td>
+                    <div class="label-reception">{{ item.job_category }}</div>
+                    <div class="description-truncate">{{ item.job_description }}</div>
+                </td>
+
+                <td class="col-salary">
+                    <span class="company-name">{{ item.salary }}</span>
+                </td>
+
+                <td class="col-link">
+                    <a href="{{ item.detail_url }}" target="_blank" class="link-item">詳細</a>
+                    <a href="{{ item.pdf_url }}" target="_blank" class="link-item">求人票</a>
+                </td>
+
+                <td class="col-add">
+                    <a href="{{ url_for('delete_item', item_id=item.id) }}" class="btn-delete-text"
+                        onclick="return confirm('リストから削除しますか？')">削除</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</form>
 
 {% if not saved_jobs %}
 <div class="empty-state">
